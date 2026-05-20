@@ -1,0 +1,116 @@
+# =============================================================================
+# LLP backend — local development with docker-compose
+# =============================================================================
+# Bring up: docker compose up --build
+# First time:
+#   docker compose run --rm web python manage.py migrate
+#   docker compose run --rm web python manage.py seed_tiers
+#   docker compose run --rm web python manage.py createsuperuser
+#   docker compose run --rm web python manage.py load_corpus --zip /path/to/llp-chat-data6.zip
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: llp
+      POSTGRES_PASSWORD: llp
+      POSTGRES_DB: llp
+    ports:
+      - "5432:5432"
+    volumes:
+      - llp_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U llp"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py seed_tiers &&
+             python manage.py runserver 0.0.0.0:8000"
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+      SECRET_KEY: dev-insecure-key-change-me
+      DEBUG: "True"
+      DATABASE_URL: postgres://llp:llp@db:5432/llp
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      ALLOWED_HOSTS: "localhost,127.0.0.1,web"
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      EMBEDDING_DIM: "768"
+      CORS_ALLOWED_ORIGINS: "http://localhost:3001,http://localhost:3000"
+      CSRF_TRUSTED_ORIGINS: "http://localhost:3001,http://localhost:3000"
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - llp_media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+        
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A config.celery worker --loglevel=info --concurrency=2
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+      SECRET_KEY: dev-insecure-key-change-me
+      DATABASE_URL: postgres://llp:llp@db:5432/llp
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      EMBEDDING_DIM: "768"
+    volumes:
+      - .:/app
+      - llp_media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A config.celery beat --loglevel=info
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+      SECRET_KEY: dev-insecure-key-change-me
+      DATABASE_URL: postgres://llp:llp@db:5432/llp
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  llp_db_data:
+  llp_media:

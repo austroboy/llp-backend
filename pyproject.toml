@@ -1,0 +1,95 @@
+[project]
+name = "llp-backend"
+version = "1.0.0"
+description = "Labor Law Partner — Django + Claude AI Chatbot Backend"
+requires-python = ">=3.12"
+
+dependencies = [
+    # Django + DRF
+    "Django>=5.1,<5.2",
+    "djangorestframework>=3.15",
+    "django-cors-headers>=4.4",
+    "django-environ>=0.11",
+    "django-filter>=24.3",
+    "drf-spectacular>=0.27",
+    "djangorestframework-simplejwt>=5.3",
+    "django-redis>=5.4",
+
+    # Database
+    "psycopg[binary,pool]>=3.2",
+    "pgvector>=0.3.6",
+
+    # Async / streaming
+    "channels>=4.1",
+    "channels-redis>=4.2",
+    "daphne>=4.1",
+
+    # Tasks
+    "celery>=5.4",
+    "redis>=5.0",
+
+    # AI providers
+    "anthropic>=0.39",
+    "google-generativeai>=0.8",
+
+    # File handling
+    "python-docx>=1.1",
+    "pypdf>=5.0",
+    "python-magic>=0.4.27",
+
+    # Auth & security
+    "argon2-cffi>=23.1",
+    "PyJWT>=2.9",
+    "cryptography>=43.0",
+
+    # Server
+    "gunicorn>=23.0",
+    "uvicorn[standard]>=0.32",
+    "whitenoise>=6.7",
+
+    # Storage / S3
+    "boto3>=1.35",
+    "django-storages>=1.14",
+
+    # Utilities
+    "tenacity>=9.0",
+    "structlog>=24.4",
+    "sentry-sdk>=2.16",
+    "pydantic>=2.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-django>=4.9",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=5.0",
+    "factory-boy>=3.3",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "django-stubs[compatible-mypy]>=5.1",
+    "djangorestframework-stubs>=3.15",
+    "ipython>=8.27",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "C4", "DJ", "SIM"]
+ignore = ["E501", "DJ001"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["tests.py", "test_*.py", "*_test.py"]
+addopts = "-ra --strict-markers"
+testpaths = ["tests", "apps"]
+
+[tool.mypy]
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
+python_version = "3.12"
+strict_optional = true
+
+[tool.django-stubs]
+django_settings_module = "config.settings.dev"

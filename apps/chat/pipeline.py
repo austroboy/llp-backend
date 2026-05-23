@@ -219,7 +219,7 @@ def run_pipeline(ctx: PipelineContext) -> Iterator[PipelineEvent]:
     # ── 4. Intent classification ─────────────────────────────────────
     classification = classify_intent(ctx.user_message)
     has_attachment = bool(ctx.attachments) and tier_cfg["file_upload_allowed"]
-    mode = select_mode(classification, has_attachment=has_attachment)
+    mode = select_mode(classification, has_attachment=has_attachment, message=ctx.user_message)
 
     # ── 4b. V3.1 Multi-question bypass ───────────────────────────────
     # If user clearly asked multiple concrete questions (numbered or

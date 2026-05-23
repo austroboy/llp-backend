@@ -202,6 +202,72 @@ _SETTLED_RULE_PATTERNS = [
 ]
 _SETTLED_RULE_RE = re.compile("|".join(_SETTLED_RULE_PATTERNS), re.IGNORECASE)
 
+# Greeting / small-talk patterns. When a message is just a greeting we want
+# to reply warmly with a one-liner that invites a real question — NOT push a
+# legal-clarification picker. Worker who says "hi" gets a friendly nudge,
+# not a 4-button "I want to know if this was done legally" wall.
+_GREETING_PATTERNS = [
+    r"^\s*(hi|hello|hey|yo|hii+|heya|sup|wassup|what'?s up|howdy)\b",
+    r"^\s*(hi|hello|hey)\s+(there|llp|bot|partner)\b",
+    r"\bhow\s+(are|r)\s+(you|u|ya)\b",
+    r"\bwhat'?s up\b",
+    r"\bgood\s+(morning|afternoon|evening|night)\b",
+    r"\bnice to meet you\b",
+    r"\bthank\s*(s|you)\b\s*$",  # bare "thanks", not "thanks, but..."
+    r"\bthx\b\s*$",
+    # Bangla greetings
+    r"^\s*(আসসালামু আলাইকুম|আস্সালামু আলাইকুম|সালাম)",
+    r"^\s*(হ্যালো|হাই|নমস্কার|আদাব)",
+    r"\bকেমন\s+আছেন\b",
+    r"\bকেমন\s+আছো\b",
+    r"\bসুপ্রভাত\b",
+    r"\bশুভ\s+(সকাল|সন্ধ্যা|রাত্রি|রাত)\b",
+    r"\bধন্যবাদ\b\s*$",
+]
+_GREETING_RE = re.compile("|".join(_GREETING_PATTERNS), re.IGNORECASE)
+
+
+def _looks_like_greeting(message: str) -> bool:
+    """True if the message is a greeting / small-talk rather than a question.
+
+    Tightening rule: even if a greeting word is present, treat the whole
+    message as a real question if it contains a '?' or any obvious legal/HR
+    domain keyword. This handles things like 'Hi, what is the notice
+    period?' which are real questions wrapped in pleasantries.
+    """
+    if not message:
+        return False
+    text = message.strip()
+    if len(text) > 60:
+        return False
+    # If a question mark is present anywhere AND the message isn't itself
+    # something like "How are you?", treat it as a question — except for the
+    # pure greeting forms that legitimately end with "?".
+    has_q = "?" in text
+    # Any legal/HR domain keyword anywhere → it's a question, not a greeting.
+    domain_re = re.compile(
+        r"\b(notice|period|leave|gratuity|maternity|overtime|salary|wage|"
+        r"terminat|resign|dismiss|retrench|fire|fired|compensation|benefit|"
+        r"work permit|visa|holiday|provident|pf|bonus|contract|employ|labor|"
+        r"labour|hr|হোলিডে|ছুটি|বেতন|মজুরি|চাকরি|নোটিশ|গ্র্যাচুইটি|"
+        r"কর্মী|শ্রম|আইন|কর্মঘণ্টা|মাতৃত্ব|ওভারটাইম)\b",
+        re.IGNORECASE,
+    )
+    if domain_re.search(text):
+        return False
+    # Bare "how are you?" still counts as greeting, but "hi, what notice" doesn't
+    if has_q:
+        # Only allow the explicit how-are-you / what's-up greeting questions
+        pure_greeting_q = re.compile(
+            r"^\s*(hi|hello|hey|hii+)?\s*,?\s*"
+            r"(how\s+(are|r)\s+(you|u|ya)|what'?s up|how'?s it going|"
+            r"কেমন\s+আছেন|কেমন\s+আছো)\s*\??\s*$",
+            re.IGNORECASE,
+        )
+        if not pure_greeting_q.search(text):
+            return False
+    return bool(_GREETING_RE.search(text))
+
 
 def _looks_like_settled_rule(message: str) -> bool:
     """True if the message is asking about a statutory rule with one answer.
@@ -216,11 +282,21 @@ def _looks_like_settled_rule(message: str) -> bool:
 def select_mode(intent: IntentClassification, has_attachment: bool, message: str = "") -> str:
     """Map an intent classification to a response mode.
 
-    `message` is the original user text — used for the settled-rule backstop
-    that overrides over-eager AMBIGUOUS_SCENARIO classifications.
+    `message` is the original user text — used for greeting detection and
+    the settled-rule backstop that overrides over-eager AMBIGUOUS_SCENARIO
+    classifications.
     """
     if has_attachment:
         return "document_review"
+    # Greetings and small-talk get a warm one-liner reply, not the legal
+    # clarification picker. Check this BEFORE the NOT_A_QUESTION branch
+    # because Haiku usually classifies "hi how are you" as NOT_A_QUESTION.
+    if _looks_like_greeting(message):
+        logger.info(
+            "intent.greeting_detected",
+            extra={"primary_intent": intent.primary_intent},
+        )
+        return "greeting"
     if intent.primary_intent == Intent.NOT_A_QUESTION:
         # Very short / vague inputs still benefit from a clarifying nudge.
         return "clarification"

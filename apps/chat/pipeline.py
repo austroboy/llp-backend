@@ -264,7 +264,14 @@ def run_pipeline(ctx: PipelineContext) -> Iterator[PipelineEvent]:
         },
     )
 
-    # ── 7. Clarification mode short-circuit ──────────────────────────
+    # ── 7. Greeting mode short-circuit ───────────────────────────────
+    # User just said hi / hello / কেমন আছেন etc. Reply warmly with a
+    # one-liner that invites a real question, no retrieval / LLM call.
+    if mode == "greeting":
+        yield from _run_greeting(ctx, classification)
+        return
+
+    # ── 7b. Clarification mode short-circuit ─────────────────────────
     if mode == "clarification":
         yield from _run_clarification(ctx, classification)
         return
@@ -467,6 +474,38 @@ def run_pipeline(ctx: PipelineContext) -> Iterator[PipelineEvent]:
             "model": model_name_used,
             "latency_ms": int((time.perf_counter() - started) * 1000),
         },
+    )
+
+
+def _run_greeting(ctx: PipelineContext, classification: IntentClassification) -> Iterator[PipelineEvent]:
+    """Greeting / small-talk mode.
+
+    Sends back a warm one-liner that nudges the user toward a real question.
+    No retrieval, no LLM — fixed text, two language variants.
+    """
+    if classification.language == "bangla":
+        text = (
+            "আস্সালামু আলাইকুম। আমি Labor Law Partner — বাংলাদেশের শ্রম আইন ২০০৬ "
+            "ও শ্রম বিধি ২০১৫ নিয়ে আপনাকে সাহায্য করব। আপনার কর্মস্থলের পরিস্থিতি "
+            "বা আইনি প্রশ্নটি লিখুন — যেমন নোটিশ পিরিয়ড, গ্র্যাচুইটি, ছুটি, "
+            "ওভারটাইম, বা চাকরিচ্যুতির নিয়ম।"
+        )
+    else:
+        text = (
+            "Hi! I'm Labor Law Partner — I help with the Bangladesh Labour Act 2006, "
+            "the Labour Rules 2015, and their amendments. Ask me anything about your "
+            "workplace situation — for example notice period, gratuity, leave, overtime, "
+            "or termination rules."
+        )
+    yield PipelineEvent(type="text", data={"delta": text})
+    msg = ChatMessage.objects.create(
+        conversation=ctx.conversation, role=ChatMessage.ROLE_ASSISTANT,
+        content=text, intent=Intent.NOT_A_QUESTION, mode="greeting",
+        verdict="greeting",
+    )
+    yield PipelineEvent(
+        type="done",
+        data={"message_id": msg.id, "cached": False, "latency_ms": 0},
     )
 
 

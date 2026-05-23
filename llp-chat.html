@@ -416,6 +416,19 @@
     sendMessage();
   }
 
+  // Called when the user clicks one of the clarification buttons the
+  // backend renders (e.g. "I want to know if this was done legally").
+  // It treats the button's text as the next user message and submits it
+  // through the same pipeline as a typed question.
+  function sendClarification(btn) {
+    if (!guestToken) { showNotification('আগে সংযোগ করুন', 'error'); return; }
+    if (isStreaming) return;
+    const text = (btn.textContent || '').trim();
+    if (!text) return;
+    document.getElementById('message-input').value = text;
+    sendMessage();
+  }
+
   function appendMessage(role, content) {
     const welcome = document.getElementById('welcome-screen');
     if (welcome) welcome.remove();

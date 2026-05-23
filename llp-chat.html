@@ -264,7 +264,7 @@
 
 <div id="config-bar">
   <label>🔌 API URL:</label>
-  <input id="api-url-input" type="text" value="http://localhost:8000" placeholder="http://localhost:8000" />
+  <input id="api-url-input" type="text" placeholder="http://localhost:8000" />
   <button id="connect-btn" onclick="connect()">সংযোগ করুন</button>
 </div>
 
@@ -306,7 +306,38 @@
 <div id="notification"></div>
 
 <script>
-  let API_BASE = 'http://localhost:8000';
+  // Smart default: when this page is served from a real http(s) origin
+  // (e.g. the VPS at 178.105.206.187:8080), use that same origin so the
+  // user doesn't have to retype the URL. Only fall back to localhost:8000
+  // when the page is opened directly as a file:// (local dev).
+  function resolveDefaultApiBase() {
+    try {
+      const loc = window.location;
+      if (loc.protocol === 'http:' || loc.protocol === 'https:') {
+        // Same-origin: drop the trailing slash so it matches the field's
+        // pattern, e.g. "http://178.105.206.187:8080".
+        return `${loc.protocol}//${loc.host}`;
+      }
+    } catch (_) { /* fall through */ }
+    return 'http://localhost:8000';
+  }
+
+  let API_BASE = resolveDefaultApiBase();
+
+  // Pre-fill the input so the user can see/edit if they want. Use a
+  // DOMContentLoaded guard so this works whether the script runs before or
+  // after the body is parsed.
+  (function prefillApiInput() {
+    const fill = () => {
+      const input = document.getElementById('api-url-input');
+      if (input && !input.value) input.value = API_BASE;
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', fill);
+    } else {
+      fill();
+    }
+  })();
   let guestToken = null;
   let conversationId = null;
   let currentLang = 'bn';
@@ -528,6 +559,7 @@
       document.getElementById('message-input').focus();
     }
   }
+
   window.addEventListener('load', () => { setTimeout(connect, 500); });
 </script>
 </body>

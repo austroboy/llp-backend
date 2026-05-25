@@ -190,6 +190,42 @@ def _looks_like_multi_question(text: str) -> bool:
     return len(_split_subquestions(text)) > 1
 
 
+def _previous_turn_asked_clarification(conv: "Conversation") -> bool:
+    """Did the most recent assistant message end with a clarifying question?
+
+    Used to override classifier-triggered clarification when the user's reply
+    is actually them ANSWERING a question we asked. Without this, a short
+    reply like "অন্য কোনো কারণে মৃত্যু" looks ambiguous in isolation and the
+    bot loops back into a generic 4-option picker instead of computing the
+    answer using the disambiguating fact the user just supplied.
+    """
+    last_assistant = (
+        conv.messages.filter(role=ChatMessage.ROLE_ASSISTANT)
+        .order_by("-created_at")
+        .first()
+    )
+    if not last_assistant or not last_assistant.content:
+        return False
+    text = last_assistant.content
+    # Verification questions end with "?" and typically present numbered
+    # alternatives or use phrasing like "which of these" / "মৃত্যুর কারণ" /
+    # "মৃত্যুর কারণ কী". Detect either a question mark in the last 200 chars
+    # or stored clarification_options on the message.
+    if last_assistant.clarification_options:
+        return True
+    tail = text[-300:]
+    if "?" in tail or "?" in tail:
+        # Cheap filter: avoid treating an answer-with-trailing-question as a
+        # clarification. Look for at least one obvious cue word.
+        cues = [
+            "which of these", "which one", "do you mean", "could you",
+            "কোনটি", "কোন ধরনের", "কী ছিল", "কোন কারণ", "জানা দরকার",
+            "জানা জরুরি", "উল্লেখ করলে",
+        ]
+        return any(c.lower() in text.lower() for c in cues)
+    return False
+
+
 def run_pipeline(ctx: PipelineContext) -> Iterator[PipelineEvent]:
     started = time.perf_counter()
 
@@ -232,6 +268,20 @@ def run_pipeline(ctx: PipelineContext) -> Iterator[PipelineEvent]:
                 "original_intent": classification.primary_intent,
                 "num_subquestions": len(_split_subquestions(ctx.user_message)),
             },
+        )
+        classification.primary_intent = Intent.FACTUAL
+        mode = "direct"
+
+    # ── 4c. Verification-followup bypass ─────────────────────────────
+    # If the previous assistant turn asked a clarifying/verification
+    # question (e.g. "what was the cause of death?"), the current user
+    # message is almost certainly the ANSWER to that question — not a
+    # fresh ambiguous query. Force FACTUAL/direct so retrieval runs on
+    # the combined recent context.
+    if mode == "clarification" and _previous_turn_asked_clarification(ctx.conversation):
+        logger.info(
+            "pipeline.verification_followup_bypass",
+            extra={"original_intent": classification.primary_intent},
         )
         classification.primary_intent = Intent.FACTUAL
         mode = "direct"
@@ -293,11 +343,10 @@ def run_pipeline(ctx: PipelineContext) -> Iterator[PipelineEvent]:
         seen_node_ids: set[str] = set()
         for sub in sub_queries:
             sub_hits = hybrid_search(sub, top_k=5, language=lang_filter)
-            # Soft fallback: if language-filtered search is empty for this
-            # sub-question, retry without the filter. Common case: user
-            # types in Bangla-Latin script ("Section 286 er fine koto") so
-            # classifier returns language=bangla, but the corpus nodes are
-            # in English (DOC-011, etc.) and get filtered out.
+            # Soft fallback: if the language-filtered search comes up empty
+            # for a sub-question, retry without the filter. Common case:
+            # user types Bangla-Latin script and the classifier labels it
+            # "bangla", but the corpus nodes are English (DOC-011 etc.).
             if not sub_hits and lang_filter is not None:
                 sub_hits = hybrid_search(sub, top_k=5, language=None)
             for h in sub_hits:
@@ -307,10 +356,8 @@ def run_pipeline(ctx: PipelineContext) -> Iterator[PipelineEvent]:
         hits: list[RetrievalHit] = all_hits[:12]
     else:
         hits = hybrid_search(ctx.user_message, top_k=8, language=lang_filter)
-        # Same soft-fallback for the single-question path. Language is a
-        # convenience filter, not a hard scope boundary — if the user's
-        # question doesn't surface any nodes in their detected language,
-        # we'd rather show English nodes than refuse the query entirely.
+        # Same soft fallback for the single-question path. Language is a
+        # convenience filter, not a hard scope boundary.
         if not hits and lang_filter is not None:
             logger.info(
                 "pipeline.lang_filter_fallback",

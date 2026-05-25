@@ -228,6 +228,21 @@
   }
   .lang-btn.active { background: var(--accent); color: #000; font-weight: 600; }
 
+  /* ── Header action buttons (Export, Clear) ───────────────────────── */
+  .chat-action-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 11px; font-size: 12px; font-weight: 500;
+    background: var(--surface2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    cursor: pointer; transition: all 0.15s;
+    font-family: inherit;
+  }
+  .chat-action-btn:hover {
+    border-color: var(--accent); color: var(--accent);
+  }
+  .chat-action-btn:active { transform: translateY(1px); }
+  .chat-action-btn span { font-size: 13px; }
+
   #notification {
     position: fixed; top: 70px; right: 20px;
     background: var(--surface2); border: 1px solid var(--border);
@@ -344,6 +359,12 @@
     </div>
   </div>
   <div style="display:flex;gap:10px;align-items:center;">
+    <button class="chat-action-btn" onclick="exportChat()" title="Download chat as .txt">
+      <span>📥</span> Export
+    </button>
+    <button class="chat-action-btn" onclick="clearChat()" title="Clear saved chat">
+      <span>🗑️</span> Clear
+    </button>
     <div class="lang-toggle">
       <button class="lang-btn active" onclick="setLang('bn')">বাংলা</button>
       <button class="lang-btn" onclick="setLang('en')">English</button>
@@ -452,6 +473,124 @@
   let guestToken = null;
   let conversationId = null;
   let currentLang = 'bn';
+
+  // ── Chat history persistence ────────────────────────────────────────
+  // Keep a plain-text record of every turn (role + content + optional
+  // legal_basis rows) in memory and mirror it into localStorage so a
+  // refresh restores the visible thread. We deliberately store text only
+  // (not HTML) to keep the data portable across schema/UI changes.
+  const HISTORY_KEY = 'llp_chat_history_v1';
+  let chatHistory = [];  // [{role: 'user'|'assistant', content, legalBasis?, ts}]
+
+  function loadHistory() {
+    try {
+      const raw = localStorage.getItem(HISTORY_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed) || parsed.length === 0) return;
+      chatHistory = parsed;
+      const welcome = document.getElementById('welcome-screen');
+      if (welcome) welcome.remove();
+      for (const msg of chatHistory) {
+        const bubble = appendMessage(msg.role, msg.content, /*persist=*/false);
+        if (msg.role === 'assistant' && msg.legalBasis && msg.legalBasis.length) {
+          bubble.innerHTML = formatContent(msg.content) + renderCitationChips(msg.legalBasis);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to restore chat history:', e);
+    }
+  }
+
+  function saveHistory() {
+    try {
+      // Cap at 100 most recent messages so localStorage doesn't bloat.
+      const toSave = chatHistory.slice(-100);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(toSave));
+    } catch (e) {
+      console.warn('Failed to save chat history:', e);
+    }
+  }
+
+  function recordTurn(role, content, legalBasis) {
+    chatHistory.push({
+      role,
+      content,
+      legalBasis: legalBasis || null,
+      ts: new Date().toISOString(),
+    });
+    saveHistory();
+  }
+
+  // ── Export chat as .txt file ────────────────────────────────────────
+  function exportChat() {
+    if (chatHistory.length === 0) {
+      showNotification(
+        currentLang === 'bn' ? 'কোনো চ্যাট নেই।' : 'Nothing to export yet.',
+        'error',
+      );
+      return;
+    }
+    const lines = [];
+    lines.push('Labor Law Partner — Chat Transcript');
+    lines.push(`Exported: ${new Date().toLocaleString()}`);
+    lines.push('═'.repeat(60));
+    lines.push('');
+    for (const msg of chatHistory) {
+      const label = msg.role === 'user' ? 'YOU' : 'LLP';
+      lines.push(`[${label}]`);
+      lines.push(msg.content);
+      if (msg.role === 'assistant' && msg.legalBasis && msg.legalBasis.length) {
+        lines.push('');
+        lines.push('Sources:');
+        for (const row of msg.legalBasis) {
+          lines.push(`  • ${row.reference_label || row.issue} (${row.node_id || '—'})`);
+        }
+      }
+      lines.push('');
+      lines.push('─'.repeat(60));
+      lines.push('');
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 16);
+    a.href = url;
+    a.download = `llp-chat-${stamp}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showNotification(
+      currentLang === 'bn' ? 'চ্যাট ডাউনলোড হয়েছে।' : 'Chat downloaded.',
+      'success',
+    );
+  }
+
+  // ── Clear saved chat ────────────────────────────────────────────────
+  function clearChat() {
+    if (chatHistory.length === 0) return;
+    const confirmMsg = currentLang === 'bn'
+      ? 'সকল চ্যাট মুছে ফেলবেন? এটি আর ফিরিয়ে আনা যাবে না।'
+      : 'Clear all saved chat? This cannot be undone.';
+    if (!confirm(confirmMsg)) return;
+    chatHistory = [];
+    try { localStorage.removeItem(HISTORY_KEY); } catch (e) {}
+    const chatArea = document.getElementById('chat-area');
+    chatArea.innerHTML = '';
+    // Re-inject the welcome screen so the empty state matches a fresh load.
+    const welcome = document.createElement('div');
+    welcome.className = 'welcome';
+    welcome.id = 'welcome-screen';
+    welcome.innerHTML = `<div class="welcome-icon">⚖️</div>
+      <h2>${currentLang === 'bn' ? 'লেবার ল পার্টনার' : 'Labor Law Partner'}</h2>
+      <p>${currentLang === 'bn' ? 'আপনার প্রশ্ন লিখুন শুরু করতে।' : 'Type your question to begin.'}</p>`;
+    chatArea.appendChild(welcome);
+    showNotification(
+      currentLang === 'bn' ? 'চ্যাট মুছে ফেলা হয়েছে।' : 'Chat cleared.',
+      'success',
+    );
+  }
   let isStreaming = false;
 
   function setLang(lang) {
@@ -540,7 +679,7 @@
     sendMessage();
   }
 
-  function appendMessage(role, content) {
+  function appendMessage(role, content, persist) {
     const welcome = document.getElementById('welcome-screen');
     if (welcome) welcome.remove();
     const chatArea = document.getElementById('chat-area');
@@ -677,6 +816,7 @@
     isStreaming = true;
 
     appendMessage('user', text);
+    recordTurn('user', text);
     const typingEl = addTypingIndicator();
 
     try {
@@ -752,6 +892,10 @@
               if (legalBasisRows.length > 0 && fullText) {
                 bubble.innerHTML = formatContent(fullText) + renderCitationChips(legalBasisRows);
               }
+              // Persist the assistant turn so the thread survives a refresh.
+              if (fullText) {
+                recordTurn('assistant', fullText, legalBasisRows);
+              }
               break outer;
             } else if (type === 'error') {
               throw new Error(evt.message || 'Stream error');
@@ -782,7 +926,12 @@
     }
   }
 
-  window.addEventListener('load', () => { setTimeout(connect, 500); });
+  window.addEventListener('load', () => {
+    // Restore any previously-saved chat before connecting so the user sees
+    // their thread immediately on refresh.
+    loadHistory();
+    setTimeout(connect, 500);
+  });
 </script>
 </body>
 </html>

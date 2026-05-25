@@ -238,6 +238,99 @@
   #notification.show { opacity: 1; transform: translateY(0); }
   #notification.success { border-color: var(--accent); color: var(--accent); }
   #notification.error { border-color: var(--error); color: var(--error); }
+
+  /* ── Citation chips ─────────────────────────────────────────────── */
+  .citations-row {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin: 10px 0 0; padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .citations-row-label {
+    font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted); margin-right: 8px; align-self: center;
+  }
+  .citation-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text);
+    border-radius: 999px; font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s; font-family: inherit;
+  }
+  .citation-chip:hover {
+    border-color: var(--accent); color: var(--accent);
+  }
+  .citation-chip-verdict {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+  }
+  .citation-chip-verdict.unverified { background: var(--gold); }
+  .citation-chip-verdict.partial { background: var(--gold); }
+
+  /* ── Source drawer (Perplexity-style) ───────────────────────────── */
+  .source-drawer-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+    z-index: 200; opacity: 0; pointer-events: none;
+    transition: opacity 0.25s; backdrop-filter: blur(2px);
+  }
+  .source-drawer-overlay.open { opacity: 1; pointer-events: auto; }
+  .source-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: min(620px, 100vw); background: var(--surface);
+    border-left: 1px solid var(--border); z-index: 201;
+    transform: translateX(100%); transition: transform 0.3s ease-out;
+    display: flex; flex-direction: column;
+    box-shadow: -8px 0 32px rgba(0,0,0,0.4);
+  }
+  .source-drawer.open { transform: translateX(0); }
+  .source-drawer-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    padding: 18px 22px; border-bottom: 1px solid var(--border);
+    gap: 16px;
+  }
+  .source-drawer-head h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px; font-weight: 700; color: var(--text);
+    margin: 0 0 4px;
+  }
+  .source-drawer-eyebrow {
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); display: block;
+  }
+  .source-drawer-close {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); width: 32px; height: 32px;
+    border-radius: 8px; cursor: pointer; font-size: 18px;
+    flex-shrink: 0; transition: all 0.15s;
+  }
+  .source-drawer-close:hover {
+    border-color: var(--accent); color: var(--accent);
+  }
+  .source-drawer-meta {
+    padding: 14px 22px; border-bottom: 1px solid var(--border);
+    display: grid; grid-template-columns: auto 1fr; gap: 6px 14px;
+    font-size: 12px;
+  }
+  .source-drawer-meta dt {
+    color: var(--muted); font-weight: 500;
+    letter-spacing: 0.08em; text-transform: uppercase; font-size: 10px;
+  }
+  .source-drawer-meta dd { color: var(--text); }
+  .source-drawer-body {
+    padding: 22px; overflow-y: auto; flex: 1;
+    line-height: 1.7; font-size: 14px; color: var(--text);
+    white-space: pre-wrap; word-wrap: break-word;
+  }
+  .source-drawer-body em {
+    color: var(--muted); font-style: italic;
+  }
+  .source-drawer-loading {
+    padding: 40px 22px; text-align: center; color: var(--muted);
+  }
+  @media (max-width: 640px) {
+    .source-drawer { width: 100vw; }
+    .source-drawer-meta { grid-template-columns: 1fr; gap: 2px 0; }
+    .source-drawer-meta dt { margin-top: 8px; }
+  }
 </style>
 </head>
 <body>
@@ -304,6 +397,24 @@
 </div>
 
 <div id="notification"></div>
+
+<!-- Source drawer — opens when a citation chip is clicked, fetches and shows
+     the full statutory text for the cited node from
+     /api/documents/nodes/<node_id>/. -->
+<div id="source-drawer-overlay" class="source-drawer-overlay" onclick="closeSourceDrawer()"></div>
+<aside id="source-drawer" class="source-drawer" role="dialog" aria-labelledby="source-drawer-title" aria-hidden="true">
+  <div class="source-drawer-head">
+    <div>
+      <span class="source-drawer-eyebrow" id="source-drawer-eyebrow">Source</span>
+      <h3 id="source-drawer-title">—</h3>
+    </div>
+    <button type="button" class="source-drawer-close" onclick="closeSourceDrawer()" aria-label="Close">×</button>
+  </div>
+  <dl class="source-drawer-meta" id="source-drawer-meta"></dl>
+  <div class="source-drawer-body" id="source-drawer-body">
+    <div class="source-drawer-loading">Loading source…</div>
+  </div>
+</aside>
 
 <script>
   // Smart default: when this page is served from a real http(s) origin
@@ -453,6 +564,94 @@
       .replace(/$/, '</p>');
   }
 
+  // Build the citation chip strip that appears below an assistant answer.
+  // Each chip carries the node_id and label so a click can fetch the source
+  // text. Verdicts (verified/unverified/partial) drive the dot colour.
+  function renderCitationChips(rows) {
+    if (!rows || rows.length === 0) return '';
+    const langLabel = currentLang === 'bn' ? 'উৎস' : 'Sources';
+    const chips = rows.map((r) => {
+      const verdict = (r.verdict || 'verified').toLowerCase();
+      const label = r.reference_label || r.issue || 'source';
+      const nodeId = r.node_id || '';
+      // Escape minimal HTML chars to be safe with model-emitted strings.
+      const safe = String(label)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      const safeNode = String(nodeId)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      const disabled = !nodeId ? 'opacity:0.55;cursor:not-allowed;' : '';
+      const onclick = nodeId ? `onclick="openSourceDrawer('${safeNode}', '${safe.replace(/'/g, "\\'")}')"` : '';
+      return `<button type="button" class="citation-chip" style="${disabled}" ${onclick}>`
+        + `<span class="citation-chip-verdict ${verdict}"></span>${safe}</button>`;
+    }).join('');
+    return `<div class="citations-row">`
+      + `<span class="citations-row-label">${langLabel}</span>${chips}</div>`;
+  }
+
+  // Open the side drawer and fetch the full statutory text for a node_id.
+  // The endpoint /api/documents/nodes/<node_id>/ returns title/content/etc.
+  async function openSourceDrawer(nodeId, label) {
+    if (!nodeId) return;
+    const overlay = document.getElementById('source-drawer-overlay');
+    const drawer = document.getElementById('source-drawer');
+    const titleEl = document.getElementById('source-drawer-title');
+    const eyebrowEl = document.getElementById('source-drawer-eyebrow');
+    const metaEl = document.getElementById('source-drawer-meta');
+    const bodyEl = document.getElementById('source-drawer-body');
+    titleEl.textContent = label || nodeId;
+    eyebrowEl.textContent = currentLang === 'bn' ? 'উৎস' : 'Source';
+    metaEl.innerHTML = '';
+    bodyEl.innerHTML = `<div class="source-drawer-loading">${currentLang === 'bn' ? 'লোড হচ্ছে…' : 'Loading source…'}</div>`;
+    overlay.classList.add('open');
+    drawer.classList.add('open');
+    drawer.setAttribute('aria-hidden', 'false');
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/documents/nodes/${encodeURIComponent(nodeId)}/`);
+      if (!res.ok) {
+        bodyEl.innerHTML = `<em>${currentLang === 'bn'
+          ? 'উৎসটি লোড করা যায়নি।'
+          : 'Could not load this source.'}</em>`;
+        return;
+      }
+      const data = await res.json();
+      // Title gets the section heading, eyebrow gets the doc code.
+      titleEl.textContent = data.title || label || nodeId;
+      eyebrowEl.textContent = data.doc_code
+        ? `${currentLang === 'bn' ? 'উৎস' : 'Source'} · ${data.doc_code}`
+        : (currentLang === 'bn' ? 'উৎস' : 'Source');
+      const metaParts = [];
+      if (data.doc_code) metaParts.push(['Doc', data.doc_code]);
+      if (data.section_number) metaParts.push(['Section', data.section_number]);
+      if (data.rule_number) metaParts.push(['Rule', data.rule_number]);
+      if (data.language) metaParts.push(['Language', data.language]);
+      metaEl.innerHTML = metaParts.map(([k, v]) =>
+        `<dt>${k}</dt><dd>${String(v).replace(/</g, '&lt;')}</dd>`
+      ).join('');
+      const content = data.content || data.summary
+        || (currentLang === 'bn' ? 'কোনো বিষয়বস্তু নেই।' : 'No content available.');
+      bodyEl.textContent = content;
+    } catch (err) {
+      bodyEl.innerHTML = `<em>${currentLang === 'bn'
+        ? 'উৎস লোড করতে সমস্যা হয়েছে।'
+        : 'Could not load this source.'}</em>`;
+    }
+  }
+
+  function closeSourceDrawer() {
+    const overlay = document.getElementById('source-drawer-overlay');
+    const drawer = document.getElementById('source-drawer');
+    overlay.classList.remove('open');
+    drawer.classList.remove('open');
+    drawer.setAttribute('aria-hidden', 'true');
+  }
+
+  // Esc key closes the drawer (a11y).
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSourceDrawer();
+  });
+
   function addTypingIndicator() {
     const welcome = document.getElementById('welcome-screen');
     if (welcome) welcome.remove();
@@ -507,6 +706,7 @@
       let fullText = '';
       let buffer = '';
       let currentEventType = '';
+      let legalBasisRows = [];
 
       outer: while (true) {
         const { done, value } = await reader.read();
@@ -532,6 +732,10 @@
               fullText += evt.text || evt.delta;
               bubble.innerHTML = formatContent(fullText);
               document.getElementById('chat-area').scrollTop = document.getElementById('chat-area').scrollHeight;
+            } else if (type === 'legal_basis' && Array.isArray(evt.rows)) {
+              // Capture the legal-basis rows from the backend. We render them
+              // as clickable citation chips after the answer streams in.
+              legalBasisRows = evt.rows;
             } else if (type === 'clarification' && evt.opening) {
               // clarification event — show options
               let html = `<p>${evt.opening}</p><div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;">`;
@@ -543,6 +747,11 @@
               bubble.innerHTML = html;
               document.getElementById('chat-area').scrollTop = document.getElementById('chat-area').scrollHeight;
             } else if (type === 'done') {
+              // Render the citation chip strip if we collected any legal-basis
+              // rows during the stream.
+              if (legalBasisRows.length > 0 && fullText) {
+                bubble.innerHTML = formatContent(fullText) + renderCitationChips(legalBasisRows);
+              }
               break outer;
             } else if (type === 'error') {
               throw new Error(evt.message || 'Stream error');

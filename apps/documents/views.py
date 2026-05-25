@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -139,7 +139,20 @@ class NodeListView(APIView):
 
 
 class NodeDetailView(APIView):
-    permission_classes = [IsAdminUser]
+    """Per-node detail.
+
+    GET is public because the chat UI's citation drawer fetches it to show
+    the source text of a cited section. The node text is the same content
+    that's already rendered into AI answers — exposing the source itself is
+    a transparency feature, not a privilege escalation.
+
+    PATCH stays admin-only since editing nodes is a content-curation action.
+    """
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [AllowAny()]
+        return [IsAdminUser()]
 
     def get(self, request: Request, node_id: str) -> Response:
         node = get_object_or_404(

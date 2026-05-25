@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 from django.conf import settings
@@ -23,6 +23,11 @@ class IntentClassification:
     domain: str  # e.g. "termination", "compensation", "leave"
     requires_file: bool
     is_followup: bool
+    # AMBIGUOUS_SCENARIO populates this with 2-4 scenarios the question
+    # could plausibly map to. Used to drive the contextual clarification
+    # question (e.g. "Do you mean termination-related benefits or
+    # termination timeline?"). Empty for non-ambiguous intents.
+    scenarios: list[str] = field(default_factory=list)
 
 
 _CLASSIFIER_SYSTEM = """You are an intent classifier for Labor Law Partner.
@@ -67,9 +72,31 @@ POSITIVE EXAMPLES (FACTUAL):
 - "What is the maximum working hours per day?" → FACTUAL, domain=working_hours
 
 POSITIVE EXAMPLES (AMBIGUOUS_SCENARIO):
-- "What's the safest way to terminate?" → AMBIGUOUS_SCENARIO
-- "What am I entitled to?" (no context) → AMBIGUOUS_SCENARIO
-- "What's the procedure?" (no domain) → AMBIGUOUS_SCENARIO
+- "What's the safest way to terminate?" → AMBIGUOUS_SCENARIO,
+   scenarios: ["Termination of a permanent worker for misconduct",
+               "Retrenchment due to redundancy",
+               "Discharge for inefficiency or ill health",
+               "Termination of a probationary worker"]
+- "What am I entitled to after my job ended?" (no context) → AMBIGUOUS_SCENARIO,
+   scenarios: ["Termination compensation and notice pay",
+               "Gratuity for completed service",
+               "Provident fund withdrawal",
+               "Unpaid wages and accrued leave encashment"]
+- "Tell me about termination" (vague) → AMBIGUOUS_SCENARIO,
+   scenarios: ["Termination notice period and timeline",
+               "Termination-related compensation and benefits",
+               "Grounds and procedure for lawful termination",
+               "Worker remedies against wrongful termination"]
+- "What's the procedure?" (no domain) → AMBIGUOUS_SCENARIO,
+   scenarios: ["Filing a grievance with the labour court",
+               "Registering a trade union",
+               "Disciplinary action procedure against a worker",
+               "Termination procedure under the Labour Act"]
+
+When you emit AMBIGUOUS_SCENARIO, the `scenarios` field MUST contain 2-4
+distinct, mutually exclusive options that read like full clarifying answers
+(not 1-2 word labels). Each scenario should be a phrase the user could
+recognise as describing their real situation.
 
 Output STRICT JSON only — no prose, no markdown fences. Schema:
 {
@@ -152,6 +179,12 @@ def classify_intent(message: str) -> IntentClassification:
         else:
             return _heuristic_fallback(message)
 
+    raw_scenarios = data.get("scenarios") or []
+    if isinstance(raw_scenarios, list):
+        scenarios = [str(s).strip() for s in raw_scenarios if str(s).strip()][:4]
+    else:
+        scenarios = []
+
     return IntentClassification(
         primary_intent=data.get("primary_intent", Intent.FACTUAL),
         intents=data.get("intents", [Intent.FACTUAL]),
@@ -161,6 +194,7 @@ def classify_intent(message: str) -> IntentClassification:
         domain=data.get("domain", "general"),
         requires_file=data.get("requires_file", False),
         is_followup=data.get("is_followup", False),
+        scenarios=scenarios,
     )
 
 

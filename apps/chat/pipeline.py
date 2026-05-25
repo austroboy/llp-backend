@@ -510,17 +510,66 @@ def _run_greeting(ctx: PipelineContext, classification: IntentClassification) ->
 
 
 def _run_clarification(ctx: PipelineContext, classification: IntentClassification) -> Iterator[PipelineEvent]:
-    """Mode 4: prompt the user with structured options."""
-    options = [
-        "I want to know if this was done legally",
-        "I want to understand what compensation or benefits I'm owed",
-        "I want to know my options to challenge this",
-        "I want help reviewing a document",
-    ]
-    opening = (
-        "I want to make sure I guide you in the right direction. "
-        "What would help you most right now?"
-    )
+    """Mode 4: prompt the user with structured options.
+
+    Two paths:
+    1. If the classifier returned scenarios (AMBIGUOUS_SCENARIO with a
+       populated `scenarios` field), present those exactly — they are
+       phrased to match what the user actually asked. E.g.
+           "Do you mean termination-related benefits or termination timeline?"
+    2. Otherwise, fall back to the generic four-option picker.
+    """
+    is_bangla = classification.language == "bangla"
+    scenarios = list(classification.scenarios or [])
+
+    if scenarios:
+        # Build a natural-sounding opening that names the topic the user asked
+        # about, instead of the boilerplate "I want to make sure I guide…".
+        topic = classification.domain.replace("_", " ").strip()
+        if is_bangla:
+            if topic and topic != "general":
+                opening = (
+                    f"আপনার প্রশ্নটি \"{topic}\" সম্পর্কে — কোন দিকটি জানতে চান?"
+                )
+            else:
+                opening = "ঠিক কোন বিষয়টি জানতে চান বুঝতে চাইছি — নিচের কোনটি আপনার পরিস্থিতির সাথে মেলে?"
+        else:
+            if topic and topic != "general":
+                opening = (
+                    f"To answer this precisely, which of these best matches "
+                    f"what you mean by \"{topic}\"?"
+                )
+            else:
+                opening = (
+                    "To answer this precisely, which of these best matches "
+                    "your situation?"
+                )
+        options = scenarios[:4]
+    else:
+        # Fallback: original generic picker, retained for backward
+        # compatibility when the classifier doesn't emit scenarios.
+        if is_bangla:
+            options = [
+                "এটা আইনগতভাবে সঠিক হয়েছে কি না জানতে চাই",
+                "আমি কী ক্ষতিপূরণ বা সুবিধা পাব তা বুঝতে চাই",
+                "এটার বিরুদ্ধে আমার কী অপশন আছে জানতে চাই",
+                "আমি একটি ডকুমেন্ট রিভিউ করাতে চাই",
+            ]
+            opening = (
+                "আপনাকে সঠিক দিকনির্দেশনা দিতে চাই। এই মুহূর্তে কোনটি সবচেয়ে বেশি সাহায্য করবে?"
+            )
+        else:
+            options = [
+                "I want to know if this was done legally",
+                "I want to understand what compensation or benefits I'm owed",
+                "I want to know my options to challenge this",
+                "I want help reviewing a document",
+            ]
+            opening = (
+                "I want to make sure I guide you in the right direction. "
+                "What would help you most right now?"
+            )
+
     yield PipelineEvent(type="clarification", data={"opening": opening, "options": options})
     msg = ChatMessage.objects.create(
         conversation=ctx.conversation, role=ChatMessage.ROLE_ASSISTANT,

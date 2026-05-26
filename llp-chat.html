@@ -27,7 +27,13 @@
     font-family: 'Hind Siliguri', sans-serif;
     background: var(--bg);
     color: var(--text);
+    /* Mobile fix: 100vh ignores the on-screen keyboard, so when the keyboard
+       opens the chat container grows BELOW the screen and the input area
+       slides off the visible viewport. 100dvh (dynamic viewport height)
+       shrinks with the keyboard. We keep 100vh as the older-browser
+       fallback. */
     height: 100vh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -151,8 +157,37 @@
   .bubble {
     padding: 12px 16px; border-radius: 12px;
     font-size: 14.5px; line-height: 1.7;
-    max-width: calc(100% - 44px);
+    max-width: 100%;
   }
+  /* Bubble wrapper exists so the copy button can be absolutely positioned
+     relative to the bubble. The wrap is what holds the data-raw attribute
+     for clipboard fallback. */
+  .bubble-wrap {
+    position: relative;
+    max-width: calc(100% - 44px);
+    display: inline-block;
+  }
+  .message.user .bubble-wrap,
+  .message.assistant .bubble-wrap { display: block; }
+
+  .bubble-copy-btn {
+    position: absolute; top: 6px; right: 6px;
+    width: 26px; height: 26px;
+    background: rgba(0,0,0,0.35); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; opacity: 0; transition: all 0.15s;
+    z-index: 2;
+  }
+  /* Mobile (no hover): keep the button visible at low contrast so it's
+     still discoverable but doesn't fight the message for attention. */
+  @media (hover: none) {
+    .bubble-copy-btn { opacity: 0.55; }
+  }
+  .bubble-wrap:hover .bubble-copy-btn { opacity: 1; }
+  .bubble-copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .bubble-copy-btn.copied { color: var(--accent); border-color: var(--accent); opacity: 1; }
+  .message.user .bubble-copy-btn { left: 6px; right: auto; }
   .message.user .bubble {
     background: var(--user-bubble); border: 1px solid rgba(34,197,94,0.2);
     border-bottom-right-radius: 4px; color: var(--text);
@@ -345,6 +380,23 @@
     .source-drawer { width: 100vw; }
     .source-drawer-meta { grid-template-columns: 1fr; gap: 2px 0; }
     .source-drawer-meta dt { margin-top: 8px; }
+    /* Mobile keyboard fix — reduce input area's footprint so it stays
+       visible above the on-screen keyboard. Also tighten header padding
+       and remove the hint line that ate vertical space. */
+    #input-area {
+      padding: 8px 12px 10px;
+      padding-bottom: max(8px, env(safe-area-inset-bottom));
+    }
+    .input-wrapper { padding: 6px 8px 6px 12px; gap: 6px; border-radius: 10px; }
+    #message-input { font-size: 16px; }  /* 16px stops iOS auto-zoom on focus */
+    .input-hint { display: none; }
+    header { padding: 10px 14px; }
+    header h1 { font-size: 16px; }
+    header span { font-size: 11px; }
+    .chat-action-btn { padding: 4px 8px; font-size: 11px; }
+    .chat-action-btn span:last-child { display: none; }  /* icon-only on mobile */
+    #chat-area { padding: 12px; gap: 12px; }
+    .bubble { font-size: 14px; padding: 10px 14px; }
   }
 </style>
 </head>
@@ -660,6 +712,22 @@
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   }
 
+  // When the input gains focus on mobile the on-screen keyboard slides up,
+  // shrinking the viewport. Defer to the next frame so dvh has adjusted,
+  // then pin the chat scroll to its newest message — otherwise the input
+  // can end up looking like it jumped over old text.
+  document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('message-input');
+    if (!input) return;
+    input.addEventListener('focus', () => {
+      setTimeout(() => {
+        const area = document.getElementById('chat-area');
+        if (area) area.scrollTop = area.scrollHeight;
+        input.scrollIntoView({ block: 'end', behavior: 'smooth' });
+      }, 250);
+    });
+  });
+
   function askSuggestion(el) {
     if (!guestToken) { showNotification('আগে সংযোগ করুন', 'error'); return; }
     document.getElementById('message-input').value = el.textContent;
@@ -686,10 +754,66 @@
     const div = document.createElement('div');
     div.className = `message ${role}`;
     const avatar = role === 'user' ? '👤' : '⚖️';
-    div.innerHTML = `<div class="avatar">${avatar}</div><div class="bubble">${formatContent(content)}</div>`;
+    // Each bubble gets a small copy button in its corner. We stash the raw
+    // text on the wrapper so the copy handler doesn't have to strip HTML
+    // (citation chips, formatting, etc.) every time the user clicks.
+    div.innerHTML =
+      `<div class="avatar">${avatar}</div>`
+      + `<div class="bubble-wrap" data-raw="${escapeAttr(content)}">`
+      + `<button class="bubble-copy-btn" onclick="copyBubble(this)" title="Copy">`
+      + `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`
+      + `</button>`
+      + `<div class="bubble">${formatContent(content)}</div>`
+      + `</div>`;
     chatArea.appendChild(div);
     chatArea.scrollTop = chatArea.scrollHeight;
     return div.querySelector('.bubble');
+  }
+
+  // Safe attribute-value escape so message text can ride inside an HTML
+  // attribute without breaking the markup.
+  function escapeAttr(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // Copy the raw text of a bubble (not the rendered HTML) to the clipboard.
+  // Falls back to a textarea-select trick for older browsers.
+  async function copyBubble(btn) {
+    const wrap = btn.closest('.bubble-wrap');
+    if (!wrap) return;
+    const raw = wrap.getAttribute('data-raw') || wrap.innerText || '';
+    // Unescape the attribute-escaped form back to real text.
+    const txt = raw
+      .replace(/&quot;/g, '"').replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    let ok = false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(txt);
+        ok = true;
+      }
+    } catch (e) { /* fall through */ }
+    if (!ok) {
+      // Legacy fallback — works on http:// and older browsers.
+      const ta = document.createElement('textarea');
+      ta.value = txt;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); ok = true; } catch (e) {}
+      document.body.removeChild(ta);
+    }
+    // Brief visual feedback on the button itself.
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<span style="font-size:11px;font-weight:600;">✓</span>';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.innerHTML = orig;
+      btn.classList.remove('copied');
+    }, 1100);
   }
 
   function formatContent(text) {
@@ -891,6 +1015,13 @@
               // rows during the stream.
               if (legalBasisRows.length > 0 && fullText) {
                 bubble.innerHTML = formatContent(fullText) + renderCitationChips(legalBasisRows);
+              }
+              // Sync the wrapper's data-raw with the streamed text so the
+              // copy button picks up the final answer (the wrapper was
+              // created with empty content at message-start).
+              const wrap = bubble.closest('.bubble-wrap');
+              if (wrap && fullText) {
+                wrap.setAttribute('data-raw', escapeAttr(fullText));
               }
               // Persist the assistant turn so the thread survives a refresh.
               if (fullText) {

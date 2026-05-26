@@ -937,7 +937,13 @@
       ).join('');
       const content = data.content || data.summary
         || (currentLang === 'bn' ? 'কোনো বিষয়বস্তু নেই।' : 'No content available.');
-      bodyEl.textContent = content;
+      bodyEl.innerHTML = content
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\((\d+)\)/g, '<br><strong>($1)</strong>')
+      .replace(/([a-z]\))/g, '<br>&nbsp;&nbsp;$1')
+      .replace(/\n{2,}/g, '</p><p>')
+      .replace(/\n/g, '<br>')
+      .replace(/^/, '<p>') + '</p>';
     } catch (err) {
       bodyEl.innerHTML = `<em>${currentLang === 'bn'
         ? 'উৎস লোড করতে সমস্যা হয়েছে।'

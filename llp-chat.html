@@ -380,9 +380,38 @@
     .source-drawer { width: 100vw; }
     .source-drawer-meta { grid-template-columns: 1fr; gap: 2px 0; }
     .source-drawer-meta dt { margin-top: 8px; }
-    /* Mobile keyboard fix — reduce input area's footprint so it stays
-       visible above the on-screen keyboard. Also tighten header padding
-       and remove the hint line that ate vertical space. */
+    /* ─── Mobile header restructure ─────────────────────────────────
+       Stack header onto two rows so controls don't overlap the title.
+       Row 1: logo + title (single line, no wrap).
+       Row 2: action buttons + lang toggle + status (small, tight). */
+    header {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+      padding: 10px 12px;
+    }
+    .logo { gap: 8px; }
+    .logo-icon { width: 28px; height: 28px; font-size: 14px; border-radius: 6px; }
+    .logo-text h1 { font-size: 15px; white-space: nowrap; }
+    .logo-text span { display: none; }     /* drop bilingual subtitle */
+    /* Right-side controls become their own row, evenly distributed. */
+    header > div:last-child {
+      display: flex !important;
+      justify-content: space-between;
+      gap: 6px !important;
+      flex-wrap: nowrap;
+    }
+    .chat-action-btn {
+      padding: 5px 10px; font-size: 11px;
+      min-width: 0; flex-shrink: 1;
+    }
+    .chat-action-btn span:last-child { display: none; }  /* icon only */
+    .lang-toggle { padding: 2px; }
+    .lang-btn { padding: 4px 10px; font-size: 11px; }
+    .status-badge { padding: 4px 8px; font-size: 11px; }
+    .status-badge span { display: none; }  /* show only the dot */
+
+    /* ─── Input area mobile keyboard fix ───────────────────────────── */
     #input-area {
       padding: 8px 12px 10px;
       padding-bottom: max(8px, env(safe-area-inset-bottom));
@@ -390,13 +419,27 @@
     .input-wrapper { padding: 6px 8px 6px 12px; gap: 6px; border-radius: 10px; }
     #message-input { font-size: 16px; }  /* 16px stops iOS auto-zoom on focus */
     .input-hint { display: none; }
-    header { padding: 10px 14px; }
-    header h1 { font-size: 16px; }
-    header span { font-size: 11px; }
-    .chat-action-btn { padding: 4px 8px; font-size: 11px; }
-    .chat-action-btn span:last-child { display: none; }  /* icon-only on mobile */
+
+    /* ─── Chat area + bubbles ──────────────────────────────────────── */
     #chat-area { padding: 12px; gap: 12px; }
     .bubble { font-size: 14px; padding: 10px 14px; }
+    .bubble-wrap { max-width: calc(100% - 36px); }
+    .avatar { width: 32px; height: 32px; font-size: 14px; }
+
+    /* ─── API URL bar on mobile (stack label + button so input is wide) ── */
+    #config-bar {
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px 12px;
+    }
+    #api-url-input { font-size: 13px; flex: 1 1 100%; }
+    #connect-btn { flex: 1 1 100%; }
+  }
+  /* Very small screens (<380px) — even tighter. */
+  @media (max-width: 380px) {
+    .chat-action-btn { padding: 4px 7px; }
+    .lang-btn { padding: 3px 8px; }
+    .logo-text h1 { font-size: 14px; }
   }
 </style>
 </head>

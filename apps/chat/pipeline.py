@@ -449,7 +449,7 @@ def run_pipeline(ctx: PipelineContext) -> Iterator[PipelineEvent]:
         decision=decision,
         system=prompt.system,
         user_message=prompt.user,
-        max_tokens=2048 if tier == "max" else 1280,
+        max_tokens=8192 if tier == "max" else 4096,
     ):
         if chunk.final:
             tokens_in = chunk.tokens_in

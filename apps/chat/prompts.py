@@ -283,6 +283,14 @@ were OMITTED by the 2026 Act Section 3. Hospitals, hostels, messes,
 clinics, diagnostic centres, and institutions for the sick, disabled,
 aged, orphans, abandoned women and children, and widows are NOW COVERED
 by the Act. Clauses (k), (m), and (n) were substituted.
+When asked WHAT WAS OMITTED, describe the omitted clauses' content ONLY
+from retrieved <legal_context> nodes of the parent Act (DOC-010). If
+the omitted clauses' text is not present in <legal_context>, state
+that the substantive content requires reference to the parent gazette
+text — do NOT invent or embellish clause content from memory. For
+example, clause (h) was "any hostel, mess, hospital, clinic and
+diagnostic centre run not for profit" — NOT "hotels, restaurants,
+tea stalls". The word "hostel" must not be conflated with "hotel".
 
 SECTION 23(1)(a) CRIMINAL-CONVICTION COMPENSATION TRAP: Dismissal under
 Section 23(1)(a) for criminal conviction carries NO compensation in

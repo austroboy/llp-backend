@@ -206,21 +206,24 @@ def _previous_turn_asked_clarification(conv: "Conversation") -> bool:
     )
     if not last_assistant or not last_assistant.content:
         return False
+    # Strongest signal: the previous assistant turn was recorded with
+    # mode="clarification". This catches both the generic 4-option picker
+    # and any topic-specific verification question we asked.
+    if getattr(last_assistant, "mode", None) == "clarification":
+        return True
     text = last_assistant.content
-    # Verification questions end with "?" and typically present numbered
-    # alternatives or use phrasing like "which of these" / "মৃত্যুর কারণ" /
-    # "মৃত্যুর কারণ কী". Detect either a question mark in the last 200 chars
-    # or stored clarification_options on the message.
+    # Second-strongest: the previous turn had stored clarification options.
     if last_assistant.clarification_options:
         return True
-    tail = text[-300:]
+    # Fallback: textual cues for verification questions we generated inline
+    # (e.g. "মৃত্যুর কারণ কী ছিল?" inside a model-generated answer).
+    tail = text[-400:]
     if "?" in tail or "?" in tail:
-        # Cheap filter: avoid treating an answer-with-trailing-question as a
-        # clarification. Look for at least one obvious cue word.
         cues = [
             "which of these", "which one", "do you mean", "could you",
+            "what would help you most", "guide you in the right direction",
             "কোনটি", "কোন ধরনের", "কী ছিল", "কোন কারণ", "জানা দরকার",
-            "জানা জরুরি", "উল্লেখ করলে",
+            "জানা জরুরি", "উল্লেখ করলে", "কী চান", "কোন বিষয়ে",
         ]
         return any(c.lower() in text.lower() for c in cues)
     return False
@@ -285,6 +288,28 @@ def run_pipeline(ctx: PipelineContext) -> Iterator[PipelineEvent]:
         )
         classification.primary_intent = Intent.FACTUAL
         mode = "direct"
+
+    # ── 4d. Hard anti-loop guard ─────────────────────────────────────
+    # Belt-and-braces: regardless of how mode was assigned, if the
+    # previous assistant turn was a clarification AND the current mode
+    # is still "clarification", force "direct". Clarification is a
+    # one-shot device — a second consecutive clarify is always a stall.
+    # This guard catches any path the verification-followup bypass
+    # above might miss (e.g. classifier returned a different intent
+    # but mode still ended up "clarification").
+    if mode == "clarification":
+        last_assistant = (
+            ctx.conversation.messages
+            .filter(role=ChatMessage.ROLE_ASSISTANT)
+            .order_by("-created_at")
+            .first()
+        )
+        if last_assistant and getattr(last_assistant, "mode", None) == "clarification":
+            logger.info(
+                "pipeline.anti_loop_guard",
+                extra={"reason": "previous_turn_clarification"},
+            )
+            mode = "direct"
 
     # ── 5. Intent gating ─────────────────────────────────────────────
     intent_check = check_intent_access(classification.primary_intent, tier_cfg, tier)
@@ -449,7 +474,7 @@ def run_pipeline(ctx: PipelineContext) -> Iterator[PipelineEvent]:
         decision=decision,
         system=prompt.system,
         user_message=prompt.user,
-        max_tokens=8192 if tier == "max" else 4096,
+        max_tokens=2048 if tier == "max" else 1280,
     ):
         if chunk.final:
             tokens_in = chunk.tokens_in

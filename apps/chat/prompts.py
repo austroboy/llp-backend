@@ -752,8 +752,13 @@ def build_context_block(hits: Sequence[RetrievalHit], corpus_version: str = "") 
         if h.summary:
             lines.append(f"    <summary>{h.summary}</summary>")
         if h.content:
-            # Trim very long contents — model has limits
-            body = h.content if len(h.content) < 4000 else h.content[:4000] + "…"
+            # Per-node text cap. Raised from 4000 to 18000 because the §2
+            # Definitions node is ~24k chars and important sub-clauses
+            # like §2(49) "employer" (at char ~14,610), §2(2a) "Festival
+            # Bonus", §2(9A) subsistence allowance all live past the old
+            # 4k cutoff. With the higher cap the model actually sees the
+            # operative text instead of falsely concluding "not in context".
+            body = h.content if len(h.content) < 18000 else h.content[:18000] + "…"
             lines.append(f"    <text>{body}</text>")
         lines.append("  </node>")
     lines.append("</legal_context>")

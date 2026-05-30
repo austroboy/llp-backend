@@ -125,18 +125,50 @@ def _format_reference_label(c: ExtractedCitation) -> str:
 
 
 def _match_to_node(c: ExtractedCitation, retrieved: Sequence[RetrievalHit]) -> str:
-    """Resolve a citation to one of the retrieved node_ids if possible."""
+    """Resolve a citation to one of the retrieved node_ids if possible.
+
+    If the citation specifies an Amendment Act year (e.g. "Section 12 of
+    the Bangladesh Labour (Amendment) Act 2026"), prefer the node whose
+    doc_code corresponds to that amendment year — avoids the failure
+    pattern where a citation chip surfaces DOC-004 (2013) while the
+    answer text refers to the 2026 Act.
+    """
     target_section = c.section or c.rule
     if not target_section:
         return ""
-    # Prefer a sub-section node ('264-0010') over the parent ('264')
+
+    # Map amendment-year mentions to doc_codes. The parent Act stays
+    # DOC-010, parent Rules DOC-007.
+    AMENDMENT_YEAR_TO_DOC = {
+        "2009": "DOC-002",
+        "2010": "DOC-003",
+        "2013": "DOC-004",
+        "2018": "DOC-005",
+        "2025": "DOC-006",
+        "2026": "DOC-011",
+        "2022": "DOC-008",  # Rules Amendment
+    }
+    preferred_doc = ""
+    if c.year and "amend" in (c.instrument or "").lower():
+        preferred_doc = AMENDMENT_YEAR_TO_DOC.get(c.year, "")
+    elif c.year == "2006" or (not c.year and "amend" not in (c.instrument or "").lower()):
+        preferred_doc = "DOC-010"  # parent Act
+
     candidates = [h for h in retrieved if h.section_number == target_section
                   or h.rule_number == target_section]
     if not candidates:
-        # Last resort: any retrieved node whose node_id contains the number
         candidates = [h for h in retrieved if target_section in h.node_id]
     if not candidates:
         return ""
+
+    # First filter: prefer the doc_code that matches the citation's
+    # explicit Amendment Act year.
+    if preferred_doc:
+        preferred = [h for h in candidates if h.doc_code == preferred_doc]
+        if preferred:
+            candidates = preferred
+
+    # Second filter: prefer sub-section node when sub is named.
     if c.sub:
         with_sub = [h for h in candidates if c.sub in h.node_id]
         if with_sub:

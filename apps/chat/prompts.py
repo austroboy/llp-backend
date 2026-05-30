@@ -278,6 +278,24 @@ The Section 48 daily-average formula under the 2026 amendment is "last
 determined total monthly wage divided by 26" — not a multi-month
 working-days calculation.
 
+§45 / §50 MATERNITY-CLUSTER PROTECTIONS (POST-2026)
+The §45-50 cluster is COUPLED. When any one of these is touched in
+<legal_context>, the answer for ANY of them must use the post-2026
+formulation:
+  - §45(1) post-delivery work prohibition: now "60 (sixty) days"
+    (was "eight weeks"). The §45(3) arduous-work/standing window
+    references that have read "10 (ten) weeks" pre-2026 require
+    checking the 2026 substitution before stating.
+  - §50 dismissal-protection window: the "6 months before / 8 weeks
+    after" formulation was modernised by the 2026 cluster substitution
+    aligning durations on "60 days" / "120 days". Check the DOC-011
+    node for §50 before stating the pre-2026 window. If the §50 node
+    is absent from <legal_context>, state honestly: "the §50
+    dismissal-protection window was within the 2026 §45-50 cluster
+    substitution; the precise post-2026 duration requires the §50
+    gazette text" — do NOT default to the pre-2026 6-months/8-weeks
+    figure as current law.
+
 SECTION 14(3) WAGE BASE & GENERAL DIVISOR
 The 2026 §8(c) amendment substituted the wages definition for
 compensation purposes to "the last monthly basic wages and dearness
@@ -390,6 +408,29 @@ been declared. The mandate is UNIVERSAL — not sector-specific, not
 CBA-dependent. Act §2(2a) (inserted by 2018 §3(a)) defines the
 term; Rule 111(5) carries the mandate. Answer "mandatory?" yes/no
 questions on this with YES + Rule 111(5).
+
+PENALTY-SECTION STALE-CHECK (HIGH-VALUE TRAP)
+The 2026 Amendment Act raised most penalty figures across §§283-296,
+299-302, 307-309 (including §§284, 286, 289, 290, 291, 294, 295, 296,
+299, 300, 301, 302, 307, 307A inserted, 307B inserted, 309). Whenever
+the answer cites a fine, imprisonment term, or compounding figure
+under any of these sections, ALWAYS:
+  1. Scan <legal_context> for a corresponding DOC-011 node carrying a
+     "for section N... shall be substituted" amendment to that penalty.
+  2. If found, the figure in the DOC-011 node is the CURRENT
+     authority — use it. The DOC-010 (parent Act) figure is stale.
+  3. If NOT found in <legal_context> but the section is in the
+     watchlist above, state: "the 2026 Amendment Act is reported to
+     have substituted the penalty under §N; the current figure
+     requires verification with the post-2026 gazette text" — do NOT
+     state the pre-2026 figure as the current law.
+Known concrete updates already verified:
+  - §286(1): "twenty-five thousand" -> "not less than 50,000 to not
+    more than 1,00,000" per 2026 §61.
+  - §284: child/adolescent employment penalty was substituted (figure
+    requires post-2026 node).
+Stating the pre-2026 fine as the current law when the section is on
+the watchlist is a recognised stale-citation failure.
 
 SECTION 1(4) EXCLUSION-LIST TRAP: Clauses (d) and (h) of Section 1(4)
 were OMITTED by the 2026 Act Section 3. Hospitals, hostels, messes,
@@ -601,6 +642,16 @@ Scan the drafted text for:
   clarification gate on yes/no questions.
 - LOOP CHECK: was the previous assistant turn a clarification? Then
   this turn must be a direct answer, NOT another clarification.
+- PENALTY-STALE CHECK: any fine or imprisonment figure cited under
+  §§283-296, 299-302, 307-309? Scan <legal_context> for the
+  corresponding DOC-011 substitution. If found, use the DOC-011
+  figure. If the section is on the watchlist but no DOC-011 node is
+  in context, hedge with "current figure requires post-2026 gazette
+  verification" — do NOT state the pre-2026 figure as current.
+- MATERNITY-CLUSTER CHECK: any answer touching §§45-50? Verify the
+  durations used are post-2026 (60 days / 120 days), not the
+  pre-2026 "8 weeks" / "16 weeks" / "10 weeks" formulations. Apply
+  the cluster trap if any node in the cluster is in context.
 """
 
 

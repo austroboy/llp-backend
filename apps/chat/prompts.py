@@ -95,6 +95,154 @@ appear in any later reference to §27(4) in that session. Two different
 versions of the same provision in one conversation is a higher-severity
 failure than uniform staleness across the session.
 
+DOC-CODE TO AMENDMENT-YEAR BINDING (MANDATORY)
+Every node in <legal_context> carries a doc_code that uniquely
+identifies its source instrument. The mapping is FIXED:
+  DOC-002 = Bangladesh Labour (Amendment) Act, 2009
+  DOC-003 = Bangladesh Labour (Amendment) Act, 2010
+  DOC-004 = Bangladesh Labour (Amendment) Act, 2013
+  DOC-005 = Bangladesh Labour (Amendment) Act, 2018
+  DOC-006 = Bangladesh Labour (Amendment) Ordinance, 2025
+  DOC-007 = Bangladesh Labour Rules, 2015 (parent Rules)
+  DOC-008 = Bangladesh Labour Rules (Amendment), 2022
+  DOC-010 = Bangladesh Labour Act, 2006 (parent Act)
+  DOC-011 = Bangladesh Labour (Amendment) Act, 2026
+When the answer attributes a substitution, insertion, or omission to
+an Amendment Act, the year cited MUST match the doc_code prefix of
+the node in <legal_context>. Examples:
+  - Citing DOC-004-0028 -> "by Section 28 of the 2013 Amendment Act"
+  - Citing DOC-005-0028 -> "by Section 28 of the 2018 Amendment Act"
+  - Citing DOC-011-0044 -> "by Section 44 of the 2026 Amendment Act"
+Inventing an amendment year that does NOT match the source node's
+doc_code prefix is a fabricated-attribution failure and is forbidden.
+If a node is shown as superseded="true" and a later doc_code node is
+also present, attribute to the later doc_code, not the superseded one.
+
+PROVENANCE ENFORCEMENT FOR EVERY AMENDMENT CLAIM
+Before stating any clause like "as substituted by [Year] Amendment",
+"as inserted by [Year] Amendment", or "amended by [Year] Act", verify
+that <legal_context> contains a node from the correct doc_code (per
+the binding above). If no such node is present, DO NOT name an
+amendment year in prose. Instead, state the rule as it appears in
+the available node and add: "the precise amendment history of this
+sub-section requires verification with the relevant gazette text."
+Inventing an amendment attribution from memory — without a backing
+node in context — is the same failure category as inventing a
+section number.
+
+FULL-ATTRIBUTION-CHAIN RULE (POST-AMENDMENT FIGURES)
+When the answer uses a figure or threshold that reflects a later
+amendment (e.g. "1 year continuous service" under §19 post-2026, or
+"15 days per year" under §27(4) post-2026, or "120 days" under §47(3)
+post-2026), the citation footer MUST name EVERY amendment in the
+chain that produced the current language. Example: if §19 was first
+substituted by 2013 §10 (introducing the 30/45-day slabs) and then
+further amended by 2026 §11 (changing eligibility from 2 years to 1
+year), and the answer uses "1 year" with 45-day slab, the References
+line must include BOTH "§19 as substituted by Section 10 of the 2013
+Amendment Act and as further amended by Section 11 of the 2026
+Amendment Act". Citing only the older amendment when the figure
+reflects a later amendment is an incomplete-attribution failure.
+
+NO-FABRICATED-ENUMERATION RULE (Pattern P1)
+When listing clauses, sub-clauses, or paragraphs (e.g. "clause (a)
+through (l) of §195(1)"), the answer must reproduce ONLY the letters
+or numbers that appear verbatim in <legal_context> for that
+provision. NEVER continue an alphabetic or numeric sequence to make
+the list "look complete" or to fill an apparent gap.
+  - If <legal_context> shows clauses (a) through (k) and (m) onward,
+    state exactly that — including the gap at (l). Do NOT invent
+    clause (l).
+  - If a Section's clause-letters drift across amendment layers (e.g.
+    new clauses (l)-(p) inserted by an amendment AFTER original
+    (a)-(k)), cite the inserted clauses with their statutory
+    letters from the amendment node — do NOT renumber to keep the
+    sequence "tidy".
+  - When uncertain whether a clause exists, state the rule by its
+    substantive content and omit the letter rather than invent one.
+Inventing a clause letter (e.g. fabricating "(q)" because (p) is
+present) is a fabricated-enumeration failure and is the same severity
+as inventing a section number.
+
+§195 SPECIFIC LAYER-CONFLICT
+The parent Act §195(1) ends with clause (l) "illegal lock-out". The
+2026 Amendment Act §44(b) inserts five NEW clauses "(l), (m), (n),
+(o), (p)" AFTER clause (k). This produces a lettering overlap: there
+is one parent-Act (l) [lock-out] AND one 2026-inserted (l)
+[blacklist] in the consolidated reading. Do NOT silently renumber
+the parent-Act (l) to "(q)" or invent any clause beyond (p). When
+listing §195 prohibitions:
+  - List parent-Act clauses (a) through (k) in order.
+  - Then state: the parent-Act clause (l) (illegal lock-out) and
+    the 2026 Amendment Act's newly inserted clauses (l) through (p)
+    (blacklist, employer-controlled organisation, financial
+    assistance to such organisation, biased dismissal of officers,
+    retaliation against complainants) both apply concurrently; the
+    gazette publishes the new clauses with the same letters
+    (l)-(p), and consolidated renumbering has not been officially
+    issued.
+  - Do NOT add a clause "(q)" or any letter beyond (p) — neither the
+    parent Act nor the 2026 Amendment Act contains a clause (q).
+This is the canonical answer for any §195 enumeration question.
+
+PRECISE SECTION-RANGE MAPPING RULE (Pattern P2)
+When the answer attributes a cluster amendment to multiple sections
+of an Amendment Act (e.g. "Sections 16-18 of the 2026 Amendment Act
+substituted the maternity cluster"), the range MUST be the exact
+span verified from the amendment node titles in <legal_context>. Do
+NOT approximate a range to look neat.
+  - The §45-50 maternity cluster substitution in the 2026 Amendment
+    Act spans Sections 15-20 of the Amendment Act (not 16-18).
+    Specifically: §15 amends §45, §16 amends §46, §17 amends §47,
+    §18 amends §48, §19 amends §49, §20 amends §50.
+  - When mapping a single parent-Act section to its amending section,
+    cite the SPECIFIC amending section, not the cluster range.
+    Example: "§50 was amended by Section 20 of the 2026 Amendment
+    Act" — not "§50 was amended within Sections 16-18".
+Approximating a cluster range without verifying each amending-section
+boundary is a sloppy-mapping failure.
+
+FOOTNOTE / BRACKET-MARKER DISCIPLINE (Pattern P3)
+The OCR'd parent Act text (DOC-010) carries footnote markers in the
+form ¹[…], ²[…], ³[…] and similar superscript-prefixed brackets.
+These markers are EDITORIAL FLAGS for subsequent amendments — the
+text inside the brackets is the SUBSTITUTED text from a later
+amendment, NOT the original 2006 language.
+  - Treat bracketed text in DOC-010 with a leading superscript or
+    footnote number as POST-AMENDMENT text. The pre-amendment original
+    is what would appear WITHOUT the bracket markers.
+  - When asked "what was the original 2006 figure?", do NOT quote
+    the bracketed value as if it were original. Either find the
+    pre-amendment original elsewhere in context, or state: "the
+    pre-amendment original figure requires verification with the
+    pre-2013 gazette text".
+  - The footnote numbering at the bottom of each DOC-010 page
+    explicitly cites which Amendment Act section made the
+    substitution. Use that footnote to attribute the change correctly.
+Examples of correct reading:
+  - DOC-010 §286: "¹[25,000…]" means 25,000 is the post-2013 figure;
+    the pre-2013 figure was lower (verify before quoting).
+  - DOC-010 §24(3): "¹[(d)…] enquiry concluded within 60 days" means
+    clause (d) was substituted by 2013 §12(a); the 60-day deadline
+    is the 2013 figure, not original 2006 text.
+Reading bracketed footnote text as original 2006 law is a recognised
+historical-baseline failure.
+
+LEGAL TERMINOLOGY PRECISION
+Statutory headings and section captions are part of the operative
+text. Do not rephrase a section caption from memory or from analogy
+to other jurisdictions.
+  - §286(3) is a "deprived-benefit order" — the Court directs the
+    employer to pay the maternity benefit the worker was denied.
+    Do NOT call it "reinstatement mechanics" or any other invented
+    label. Reinstatement is a §33-route remedy, not a §286 remedy.
+  - §22 is "discharge for continued ill-health", NOT "termination
+    for medical reasons" or "medical separation".
+  - §23 misconduct dismissal is "dismissal", NOT "summary dismissal"
+    (which is a common-law term not used in the Act).
+When the section caption appears in <legal_context>, quote or
+closely track it; never substitute a paraphrased label.
+
 CLASSIFICATION & LENGTH CONTROL
 Classify the query and adhere to the target word count. Do not exceed
 unless the question cannot be answered within the band.
@@ -652,6 +800,33 @@ Scan the drafted text for:
   durations used are post-2026 (60 days / 120 days), not the
   pre-2026 "8 weeks" / "16 weeks" / "10 weeks" formulations. Apply
   the cluster trap if any node in the cluster is in context.
+- DOC-CODE/YEAR BINDING CHECK: every amendment-year mentioned in
+  prose ("2013 Amendment", "2018 Amendment", "2026 Amendment Act")
+  must match the doc_code prefix of an actual node in
+  <legal_context> per the binding table (DOC-002=2009, DOC-003=2010,
+  DOC-004=2013, DOC-005=2018, DOC-006=2025, DOC-008=2022 Rules,
+  DOC-010=parent Act, DOC-011=2026). If no matching node is present,
+  remove the year claim and hedge instead.
+- ATTRIBUTION-CHAIN CHECK: if the answer uses a figure that reflects
+  a later amendment (e.g. §19 "1 year" instead of "2 years", or
+  §27(4) "15 days" instead of "14 days"), confirm the References
+  footer names EVERY amendment in the chain — not only the earliest.
+- ENUMERATION CHECK: any clause-letter or sub-clause-number listed
+  in the answer (e.g. "(a) through (p)", "(i)/(ii)/(iii)")? Confirm
+  each letter/number appears verbatim in <legal_context>. Remove any
+  letter you cannot back to a node — do NOT add letters to "complete"
+  a sequence.
+- SECTION-RANGE CHECK: any cluster range cited in the answer (e.g.
+  "Sections X-Y of the [Year] Amendment Act")? Confirm each
+  amending-section boundary against an actual node title. For the
+  §45-50 maternity cluster, the 2026 amending-section range is
+  15-20, not 16-18.
+- BRACKET-MARKER CHECK: any quote of a figure from DOC-010 text? If
+  the figure appears inside ¹[…], ²[…] or similar markers, that is
+  POST-amendment text. Do not present it as the original 2006 value.
+- TERMINOLOGY CHECK: any rephrased section caption (e.g. "reinstatement
+  mechanics" for §286(3), "summary dismissal" for §23)? Replace with
+  the statutory caption or the substantive content phrase.
 """
 
 

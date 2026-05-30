@@ -65,8 +65,12 @@ DEFAULT_TIER_CONFIGS = [
         "tier": Tier.FREE_GUEST,
         "label": "Free Guest",
         "label_bn": "ফ্রি গেস্ট",
-        "daily_request_limit": 5,
-        "rate_limit_per_min": 5,
+        # Raised during the Tanbhir-bhai verification phase so testers can
+        # run multi-question sessions without hitting the daily cap. Will
+        # return to a tighter limit (5-10) once we move to a real free
+        # plan with required sign-in.
+        "daily_request_limit": 200,
+        "rate_limit_per_min": 30,
         "session_response_cap": None,
         "allowed_intents": [Intent.FACTUAL, Intent.PROCEDURAL, Intent.PRODUCT_INQUIRY],
         "file_upload_allowed": False,

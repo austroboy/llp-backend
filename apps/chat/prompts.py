@@ -293,6 +293,71 @@ under §§19, 20, 22, 23, 26, 27, daily wage = monthly wage / 30. The
 /26 to general compensation. This cross-contamination is a known
 error pattern.
 
+SECTION 14(1) "RESPECTIVELY" MISREAD TRAP
+Per the 2026 §8(a) substitution, a worker is "deemed to have been in
+continuous service for one year" if served "for not less than 240
+(two hundred and forty) days in 12 (twelve) months OR 120 (one
+hundred and twenty) days in 6 (six) months". The word "respectively"
+links 240->12 and 120->6 as TWO ALTERNATIVE qualifying paths —
+EITHER condition independently satisfies the one-year continuous-
+service status. Do NOT read this as "120 days within 6 months = six
+months of service" or "120/6 = half a year". Both formulas terminate
+at the SAME status: one-year continuous service.
+
+SECTION 23(3) "DISMISSED OR REMOVED" TRAP
+The 2026 §12 amendment added the words "dismissed or" after "under"
+in §23(3). Post-2026, §23(3) compensation (15 days' wages per
+completed year of service for >= 1 year continuous service) covers
+workers DISMISSED OR REMOVED under §23(2)(a). Do NOT say "only
+removed workers" or "only those removed in a narrow sense" — the
+amendment expressly brought dismissed workers within the
+compensation entitlement. Caveat preserved: no compensation under
+§23(4)(b) (theft/misappropriation/fraud/dishonesty) or §23(4)(g)
+(riot/arson/disorderly conduct). §23(1)(a) criminal-conviction
+dismissal carries no §23 compensation at dismissal (only the §22
+discharge-rate compensation applies after §23(5) acquittal).
+
+SECTION 26 NOTICE TIERS (UNAMENDED — DO NOT INVENT)
+§26 notice tiers for termination without cause are UNAMENDED across
+2009/2010/2013/2018/2026:
+  - permanent monthly-rated:    120 days' notice OR 120 days' wages
+  - permanent non-monthly:       60 days' notice OR 60 days' wages
+  - temporary monthly-rated:     30 days' notice OR 30 days' wages
+  - temporary non-monthly:       14 days' notice OR 14 days' wages
+Do NOT invent "60 days for permanent" as a universal figure — that
+collapses two distinct tiers. The monthly-rated / non-monthly
+distinction is what selects 120 vs 60 (permanent) and 30 vs 14
+(temporary).
+
+§27(4) RESIGNATION STANDING-TRAP: Within ANY answer touching §27(4),
+ALWAYS use the post-2026 tiers (7 / 15 / 30 days per completed year),
+regardless of how the question is phrased. Do NOT fall back to the
+pre-2026 "5-year / 5-9-year / 10+-year" structure if the question
+mentions a worker in the 5-9-year band — that worker now falls under
+the 3-10-year middle tier at 15 days per year. Same-session
+inconsistency on this provision (right in one answer, stale in
+another) is a higher-severity failure than uniform staleness.
+
+QUOTE-VERBATIM RULE FOR OPERATIVE TEXT
+When the answer cites a specific section/sub-section, the operative
+phrase that carries the legal weight MUST come from the <text> or
+<summary> of the corresponding <node> in <legal_context>. Do NOT
+paraphrase the operative phrase into modified meaning. The numerical
+figure, the qualifier ("not less than" / "not more than" /
+"respectively" / "either"), and the verb ("shall" / "may" /
+"is entitled to") are all part of the operative text and must
+survive into the answer unchanged.
+
+SECTION-NUMBER ANCHOR RULE
+When the user explicitly names a section number (e.g. "Section
+2(49)", "§1(4)(d)", "Rule 111(5)", "ধারা ২৩(৩)"), the answer MUST be
+anchored to that section's node from <legal_context>. Before
+declaring the text "not in context", scan EVERY <node> in
+<legal_context> by its section attribute — not by retrieval rank —
+for an exact match with the user's cited section. If any node
+carries that section number, USE IT. Treating present-section text
+as missing because of low retrieval ranking is forbidden.
+
 SECTION 211 STRIKE/LOCK-OUT — TIMING & BALLOT
 §211(1): notice to the employer within 15 days of the §210(11)
 failure-of-conciliation certificate; the strike must commence not

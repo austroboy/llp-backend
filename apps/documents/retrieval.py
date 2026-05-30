@@ -7,6 +7,7 @@ is referenced by another retrieved node — favors well-connected provisions.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from typing import Optional
 
@@ -99,6 +100,21 @@ def hybrid_search(
     if not include_superseded:
         boosted = _demote_superseded(boosted)
 
+    # 6b. Section-number force-include
+    # If the user's query explicitly names a section number (e.g. "Section
+    # 2(49)", "§1(4)(d)", "Rule 111(5)", "ধারা ২৬"), pull the corresponding
+    # node directly and force it to the top of the result set — regardless of
+    # cosine ranking. This closes the "punts on text that's in the corpus"
+    # failure pattern: retrieval rank can rank an exact-section node low for
+    # short queries, leading the LLM to think the provision is absent. The
+    # boost is a constant added on top of the highest current score so the
+    # forced node always lands in the top-K window.
+    forced_ids = _force_include_by_section(query, language=language)
+    if forced_ids:
+        top_score = max(boosted.values(), default=0.0)
+        for nid in forced_ids:
+            boosted[nid] = max(boosted.get(nid, 0.0), top_score + 0.5)
+
     # 7. Filter and sort
     if not boosted:
         return []
@@ -162,6 +178,88 @@ def _demote_superseded(scores: dict[str, float]) -> dict[str, float]:
         nid: (s * 0.5 if nid in sup_ids else s)
         for nid, s in scores.items()
     }
+
+
+# ── Section-number force-include (Pattern 3 fix from Batch 03) ────────
+# Patterns we want to catch in the user's query:
+#   "Section 2(49)"  /  "section 2 (49)"
+#   "§1(4)(d)"  /  "Sec. 1(4)"
+#   "ধারা ২৩(৩)"  /  "ধারা ২৩"   (Bangla numerals normalised)
+#   "Rule 111(5)"  /  "rule 111"  /  "BLR 29"  /  "বিধি ২৯"
+_BANGLA_DIGITS = str.maketrans("০১২৩৪৫৬৭৮৯", "0123456789")
+
+_SECTION_PATTERNS = [
+    re.compile(r"(?:section|sec\.?|§)\s*(\d+[A-Za-z]?)(?:\s*\([^)]+\))*", re.IGNORECASE),
+    re.compile(r"(?:ধারা)\s*(\d+[A-Za-z]?)"),
+]
+_RULE_PATTERNS = [
+    re.compile(r"(?:rule|blr)\s*(\d+[A-Za-z]?)(?:\s*\([^)]+\))*", re.IGNORECASE),
+    re.compile(r"(?:বিধি)\s*(\d+[A-Za-z]?)"),
+]
+
+
+def _extract_cited_provisions(query: str) -> tuple[set[str], set[str]]:
+    """Return (set of section numbers, set of rule numbers) the query
+    explicitly cites. Bangla numerals are normalised to ASCII."""
+    normalised = query.translate(_BANGLA_DIGITS)
+    sections: set[str] = set()
+    rules: set[str] = set()
+    for pat in _SECTION_PATTERNS:
+        for m in pat.finditer(normalised):
+            sections.add(m.group(1).strip())
+    for pat in _RULE_PATTERNS:
+        for m in pat.finditer(normalised):
+            rules.add(m.group(1).strip())
+    return sections, rules
+
+
+def _force_include_by_section(query: str, *, language: str | None) -> list[str]:
+    """If the user's query explicitly cites a section/rule, return the
+    node_ids of those provisions so the caller can boost them to the top
+    of the result list. Returns at most one node per cited provision,
+    preferring the latest version and (for sections) the latest amendment
+    that touched it."""
+    sections, rules = _extract_cited_provisions(query)
+    if not sections and not rules:
+        return []
+
+    forced: list[str] = []
+    if sections:
+        qs = Node.objects.filter(
+            version__is_current=True,
+            section_number__in=list(sections),
+        )
+        if language:
+            qs = qs.filter(language=language)
+        # Group by section_number and pick the highest doc_code per group
+        # (DOC-011 > DOC-006 > DOC-005 > ... > DOC-010). Lexical sort works
+        # because the codes are zero-padded and Amendment Acts sort above
+        # the parent Act in this corpus.
+        seen: dict[str, str] = {}
+        for n in qs.order_by("section_number", "-doc_code"):
+            if n.section_number not in seen:
+                seen[n.section_number] = n.node_id
+        forced.extend(seen.values())
+
+    if rules:
+        qs = Node.objects.filter(
+            version__is_current=True,
+            rule_number__in=list(rules),
+        )
+        if language:
+            qs = qs.filter(language=language)
+        seen_r: dict[str, str] = {}
+        for n in qs.order_by("rule_number", "-doc_code"):
+            if n.rule_number not in seen_r:
+                seen_r[n.rule_number] = n.node_id
+        forced.extend(seen_r.values())
+
+    if forced:
+        logger.info(
+            "retrieval.force_include_by_section",
+            extra={"sections": list(sections), "rules": list(rules), "n_forced": len(forced)},
+        )
+    return forced
 
 
 def find_node_by_section(section_number: str, doc_code: str | None = None) -> Optional[Node]:

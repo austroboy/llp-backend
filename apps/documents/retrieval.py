@@ -188,6 +188,103 @@ def _demote_superseded(scores: dict[str, float]) -> dict[str, float]:
 #   "Rule 111(5)"  /  "rule 111"  /  "BLR 29"  /  "বিধি ২৯"
 _BANGLA_DIGITS = str.maketrans("০১২৩৪৫৬৭৮৯", "0123456789")
 
+# DOC-011 (2026 Amendment Act) ingestion gap: nodes are indexed by the
+# AMENDING-section number (§35, §61, §44 etc.) NOT by the target parent-
+# section they amend (§179, §286, §195 etc.). Until corpus ingestion is
+# fixed to add target-section indexing, this mapping lets the retrieval
+# force-include the right DOC-011 node when the user mentions the parent
+# section. Verified by reading 2026 Amendment Act titles directly.
+DOC011_PARENT_TO_AMENDING = {
+    # parent_section_number -> amending DOC-011 section_number
+    "1":   "3",     # §1 of parent (excluded establishments)
+    "2":   "4",     # §2 definitions
+    "3A":  "5",
+    "4":   "6",
+    "5":   "7",
+    "14":  "8",
+    "16":  "9",
+    "17":  "10",
+    "19":  "11",
+    "23":  "12",
+    "27":  "13",
+    "32":  "14",
+    "45":  "15",
+    "46":  "16",
+    "47":  "17",
+    "48":  "18",
+    "49":  "19",
+    "50":  "20",
+    "61A": "21",    # newly inserted
+    "80":  "22",
+    "81":  "23",
+    "82":  "24",
+    "85":  "25",
+    "90A": "26",
+    "117": "27",
+    "118": "28",    # 11->13 festival holidays
+    "132": "29",
+    "139": "30",
+    "151A":"31",    # newly inserted
+    "175": "32",    # platform riders
+    "178": "33",
+    "179": "35",    # TU registration fixed slabs
+    "180": "36",
+    "182": "37",
+    "183": "38",
+    "185": "39",
+    "185A":"40",
+    "188": "41",
+    "190": "42",
+    "195": "44",    # unfair labour practice list (a)-(p)
+    "196A":"45",
+    "196B":"46",    # newly inserted
+    "202": "47",
+    "203": "48",
+    "203A":"49",    # newly inserted
+    "204": "50",
+    "208": "51",
+    "211": "52",
+    "213": "53",
+    "235": "54",
+    "242": "55",
+    "264": "56",    # PF cumulative conditions
+    "266": "57",
+    "283": "58",
+    "284": "59",
+    "285": "60",
+    "286": "61",    # maternity fine 50k-1L
+    "289": "62",
+    "290": "63",
+    "291": "64",
+    "292": "65",
+    "293": "66",
+    "294": "67",
+    "295": "68",
+    "296": "69",
+    "299": "70",
+    "300": "71",
+    "301": "72",
+    "307": "73",    # residual penalty 25k-50k
+    "309": "74",
+    "317": "75",
+    "318A":"76",    # newly inserted
+    "319": "77",
+    "319A":"78",    # newly inserted
+    "323": "79",
+    "326": "80",
+    "332": "81",
+    "332A":"82",    # newly inserted
+    "338": "83",
+    "345": "85",
+    "345A":"86",    # newly inserted
+    "345B":"87",    # newly inserted
+    "345C":"88",    # newly inserted
+    "348": "89",
+    "348A":"90",
+    "348B":"91",    # newly inserted
+    "348C":"92",    # newly inserted
+}
+
 _SECTION_PATTERNS = [
     re.compile(r"(?:section|sec\.?|§)\s*(\d+[A-Za-z]?)(?:\s*\([^)]+\))*", re.IGNORECASE),
     re.compile(r"(?:ধারা)\s*(\d+[A-Za-z]?)"),
@@ -248,6 +345,29 @@ def _force_include_by_section(query: str, *, language: str | None) -> list[str]:
                 continue
             forced.append(n.node_id)
             per_section_count[n.section_number] = count + 1
+
+        # Workaround for DOC-011 (2026 Amendment) ingestion gap: nodes
+        # are indexed by the amending-section number, not the target
+        # parent section. So a query for parent §179 won't match the
+        # DOC-011 §35 node that substitutes it. Use the mapping to also
+        # pull the DOC-011 amending node when the user asked about a
+        # parent section.
+        amending_section_numbers = [
+            DOC011_PARENT_TO_AMENDING[s]
+            for s in sections
+            if s in DOC011_PARENT_TO_AMENDING
+        ]
+        if amending_section_numbers:
+            doc011_qs = Node.objects.filter(
+                version__is_current=True,
+                doc_code="DOC-011",
+                section_number__in=amending_section_numbers,
+            )
+            if language:
+                doc011_qs = doc011_qs.filter(language=language)
+            for n in doc011_qs:
+                if n.node_id not in forced:
+                    forced.append(n.node_id)
 
     if rules:
         qs = Node.objects.filter(

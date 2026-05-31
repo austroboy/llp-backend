@@ -215,10 +215,17 @@ def _extract_cited_provisions(query: str) -> tuple[set[str], set[str]]:
 
 def _force_include_by_section(query: str, *, language: str | None) -> list[str]:
     """If the user's query explicitly cites a section/rule, return the
-    node_ids of those provisions so the caller can boost them to the top
-    of the result list. Returns at most one node per cited provision,
-    preferring the latest version and (for sections) the latest amendment
-    that touched it."""
+    node_ids of ALL layers of those provisions so the caller can boost
+    them to the top of the result list.
+
+    IMPORTANT: returns ALL nodes that match (parent Act DOC-010 + every
+    amendment Act DOC-002/003/004/005/006/011 that touches the section)
+    — NOT just the latest. The LLM needs to see every amendment layer
+    concurrently to (a) synthesise the current consolidated text and
+    (b) attribute each substitution to the correct amending year. If
+    only the latest layer is surfaced, the bot tends to either miss
+    earlier substitutions or attribute changes to the wrong amendment.
+    """
     sections, rules = _extract_cited_provisions(query)
     if not sections and not rules:
         return []
@@ -231,15 +238,16 @@ def _force_include_by_section(query: str, *, language: str | None) -> list[str]:
         )
         if language:
             qs = qs.filter(language=language)
-        # Group by section_number and pick the highest doc_code per group
-        # (DOC-011 > DOC-006 > DOC-005 > ... > DOC-010). Lexical sort works
-        # because the codes are zero-padded and Amendment Acts sort above
-        # the parent Act in this corpus.
-        seen: dict[str, str] = {}
+        # Surface every layer (DOC-010 base + amendments). Cap at 6
+        # nodes per cited section so a single section can't crowd
+        # out other relevant context.
+        per_section_count: dict[str, int] = {}
         for n in qs.order_by("section_number", "-doc_code"):
-            if n.section_number not in seen:
-                seen[n.section_number] = n.node_id
-        forced.extend(seen.values())
+            count = per_section_count.get(n.section_number, 0)
+            if count >= 6:
+                continue
+            forced.append(n.node_id)
+            per_section_count[n.section_number] = count + 1
 
     if rules:
         qs = Node.objects.filter(
@@ -248,16 +256,22 @@ def _force_include_by_section(query: str, *, language: str | None) -> list[str]:
         )
         if language:
             qs = qs.filter(language=language)
-        seen_r: dict[str, str] = {}
+        per_rule_count: dict[str, int] = {}
         for n in qs.order_by("rule_number", "-doc_code"):
-            if n.rule_number not in seen_r:
-                seen_r[n.rule_number] = n.node_id
-        forced.extend(seen_r.values())
+            count = per_rule_count.get(n.rule_number, 0)
+            if count >= 4:
+                continue
+            forced.append(n.node_id)
+            per_rule_count[n.rule_number] = count + 1
 
     if forced:
         logger.info(
             "retrieval.force_include_by_section",
-            extra={"sections": list(sections), "rules": list(rules), "n_forced": len(forced)},
+            extra={
+                "sections": list(sections),
+                "rules": list(rules),
+                "n_forced": len(forced),
+            },
         )
     return forced
 
